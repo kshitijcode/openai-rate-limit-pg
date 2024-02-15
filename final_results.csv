@@ -1,3 +1,0 @@
-Model Name,Traffic Distribution,Parallel Tokens Sent,Script Execution Time (min),Total RPM Achieved,Total Number of Requests,Total Number of Requests Rate Limited,Total Number of Requests Failed,max_token,Average Prompt Tokens,Average Completion Tokens,Peak Total Tokens,Peak Prompt Tokens,Peak Completion Tokens
-gpt-4-32-k $gpt-4-32-k,0.3333333333333333,40000,15.06,19.92,300,2,0,800,1029.2866666666666,535.2233333333334,3606,2806,800
-gpt-4 $gpt-4,0.3333333333333333,40000,17.72,16.93,300,8,0,800,1029.2866666666666,536.03,3456,2806,800

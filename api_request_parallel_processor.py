@@ -264,7 +264,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_filepath", default=None)
     parser.add_argument("--request_url", default="https://openai-spike-wm.openai.azure.com/openai/deployments/gpt-4-32-k/chat/completions?api-version=2023-07-01-preview")
     parser.add_argument("--api_key", default="")
-    parser.add_argument("--max_requests_per_minute", type=int, default=180 * 1)
+    parser.add_argument("--max_requests_per_minute", type=int, default=210 * 1)
     parser.add_argument("--max_tokens_per_minute", type=int, default=40000 * 1)
     parser.add_argument("--token_encoding_name", default="cl100k_base")
     parser.add_argument("--max_attempts", type=int, default=30)
