@@ -10,6 +10,8 @@ import tiktoken  # for counting tokens
 import time  # for sleeping after rate limit is hit
 from status_tracker import StatusTracker
 from api_request import APIRequest
+import csv
+import os
 
 
 async def process_api_requests_from_file(
@@ -69,6 +71,7 @@ async def process_api_requests_from_file(
     with open(requests_filepath) as file:
         # `requests` will provide requests one at a time
         requests = file.__iter__()
+       
         logging.debug(f"File opened. Entering main loop")
         async with aiohttp.ClientSession() as session:  # Initialize ClientSession here
             while True:
@@ -134,7 +137,9 @@ async def process_api_requests_from_file(
                         available_request_capacity -= 1
                         available_token_capacity -= next_request_tokens
                         next_request.attempts_left -= 1
-
+                        status_tracker.model_name = next_request.request_json["model"]
+                        status_tracker.max_tokens = next_request.request_json.get("max_tokens", 2000)
+                        request_url = f"https://openai-spike-wm.openai.azure.com/openai/deployments/{next_request.request_json['model']}/chat/completions?api-version=2023-07-01-preview"
                         # call API
                         asyncio.create_task(
                             next_request.call_api(
@@ -175,10 +180,9 @@ async def process_api_requests_from_file(
                 
                 end_time = time.time()
                 total_elapsed_time = end_time - start_time 
-                logging.info(f"Total time elapsed: {total_elapsed_time} seconds.")
+                # logging.info(f"Total time elapsed: {total_elapsed_time} seconds.")
 
     
-
         # after finishing, log final status
         logging.info(
             f"""Parallel processing complete. Results saved to {save_filepath}"""
@@ -240,21 +244,34 @@ def task_id_generator_function():
         yield task_id
         task_id += 1
 
-# run script
+def write_results_to_csv(file_path, headers, data):
+    # Check if the file already exists to determine if headers should be written
+    file_exists = os.path.isfile(file_path)
+    
+    with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
+        
+        # Write headers only if the file is being created
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(data)
+
 if __name__ == "__main__":
     # parse command line arguments
     start_time = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--requests_filepath", default='data/parallel_processed.jsonl')
+    parser.add_argument("--requests_filepath", default='data/real_data_modified.jsonl')
     parser.add_argument("--save_filepath", default=None)
-    parser.add_argument("--request_url", default="")
+    parser.add_argument("--request_url", default="https://openai-spike-wm.openai.azure.com/openai/deployments/gpt-4-32-k/chat/completions?api-version=2023-07-01-preview")
     parser.add_argument("--api_key", default="")
-    parser.add_argument("--max_requests_per_minute", type=int, default=300 * 1)
-    parser.add_argument("--max_tokens_per_minute", type=int, default=200000 * 1)
+    parser.add_argument("--max_requests_per_minute", type=int, default=180 * 1)
+    parser.add_argument("--max_tokens_per_minute", type=int, default=40000 * 1)
     parser.add_argument("--token_encoding_name", default="cl100k_base")
     parser.add_argument("--max_attempts", type=int, default=30)
     parser.add_argument("--logging_level", default=logging.INFO)
     args = parser.parse_args()
+
+
 
     if args.save_filepath is None:
         args.save_filepath = args.requests_filepath.replace(".jsonl", "_results.jsonl")
@@ -281,16 +298,26 @@ if __name__ == "__main__":
         stop_time = time.time()
         duration_minutes = (stop_time - start_time) / 60
         total_rpm_achieved =  status_tracker.num_tasks_succeeded/ duration_minutes
-        print(f"Script execution time: {duration_minutes:.2f} minutes")
-        print(f"Average Prompt Tokens : {status_tracker.average_prompt_tokens}")
-        print(f"Average Completion Tokens : {status_tracker.average_completion_tokens}")
-        print(f"Peak Total Tokens: {status_tracker.peak_total_tokens}")
-        print(f"Peak Prompt Tokens: {status_tracker.peak_prompt_tokens}")
-        print(f"Peak Completion Tokens: {status_tracker.peak_completion_tokens}")
-        print(f"Total Number of Requests :  {status_tracker.num_tasks_succeeded}")
-        print(f"Total Number of Requests Rate Limited :  {status_tracker.num_rate_limit_errors}")
-        print(f"Total Number of Requests Failed :  {status_tracker.num_tasks_failed}")
-        print(f"Total RPM Achieved :  {total_rpm_achieved:.2f}")
+        data = {
+            "Model Name": f"{status_tracker.model_name}" ,
+            "Traffic Distribution": f"{60 / args.max_requests_per_minute:.2f}",
+            "Parallel Tokens Sent": args.max_tokens_per_minute,
+            "Script Execution Time (min)": f"{duration_minutes:.2f}",
+            "Total RPM Achieved": f"{total_rpm_achieved:.2f}",
+            "Total Number of Requests": status_tracker.num_tasks_succeeded,
+            "Total Number of Requests Rate Limited": status_tracker.num_rate_limit_errors,
+            "Total Number of Requests Failed": status_tracker.num_tasks_failed,
+            "max_token": status_tracker.max_tokens,
+            "Average Prompt Tokens": status_tracker.average_prompt_tokens,
+            "Average Completion Tokens": status_tracker.average_completion_tokens,
+            "Peak Total Tokens": status_tracker.peak_total_tokens,
+            "Peak Prompt Tokens": status_tracker.peak_prompt_tokens,
+            "Peak Completion Tokens": status_tracker.peak_completion_tokens,
+
+        }
+
+        headers = list(data.keys())
+        write_results_to_csv('final_results.csv', headers, data)
 
     
         # Run the async function

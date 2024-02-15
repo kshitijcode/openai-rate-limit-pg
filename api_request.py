@@ -61,6 +61,7 @@ class APIRequest:
         if error:
             self.result.append(error)
             if self.attempts_left:
+                status_tracker.num_rate_limit_errors += 1
                 retry_queue.put_nowait(self)
             else:
                 logging.error(

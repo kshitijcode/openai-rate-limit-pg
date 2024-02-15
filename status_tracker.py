@@ -25,6 +25,8 @@ class StatusTracker:
     peak_prompt_tokens: int = 0
     peak_completion_tokens: int = 0 
     peak_total_tokens: int= 0
+    model_name: str = ""
+    max_tokens: int = 0
 
     def update_token_metrics(self, prompt_tokens: int, completion_tokens: int):
         # Update totals
